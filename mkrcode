@@ -1,0 +1,185 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+// Define DHT sensor
+#define DHTPIN 4       // DHT sensor connected to pin 4
+#define DHTTYPE DHT11  // DHT11 sensor
+DHT dht(DHTPIN, DHTTYPE);
+
+// Define sensor pins
+#define CO2_PIN A0      // Gravity CO2 sensor connected to analog pin A0
+#define MQ135_PIN A4    // MQ-135 sensor connected to analog pin A4
+#define MQ2_PIN A6      // MQ-2 sensor connected to analog pin A6
+#define MQ7_PIN A1      // MQ-7 sensor connected to analog pin A1
+#define MQ8_PIN A2      // MQ-8 sensor connected to analog pin A2
+#define MQ6_PIN A3      // MQ-6 sensor connected to analog pin A3
+#define MQ9_PIN A5      // MQ-9 sensor connected to analog pin A5
+#define FLAME_SENSOR_PIN 6 // Flame sensor connected to digital pin 6
+
+// Define RGB LED pins
+#define LED_GREEN 2
+#define LED_RED 3
+
+// Define Buzzer pin
+#define BUZZER_PIN 5
+
+// Initialize LCD (I2C address 0x27, 20 columns, 4 rows)
+LiquidCrystal_I2C lcd(0x27, 20, 4);
+
+void setup() {
+  // Initialize Serial Monitor
+  Serial.begin(9600);
+
+  // Initialize the LCD
+  lcd.init();
+  lcd.backlight();
+  
+  // Initialize DHT sensor
+  dht.begin();
+
+  // Initialize RGB LED and buzzer pins as output
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(BUZZER_PIN, OUTPUT);
+
+  // Initialize Flame sensor pin
+  pinMode(FLAME_SENSOR_PIN, INPUT);
+
+  // Set initial states
+  digitalWrite(LED_GREEN, HIGH); // Green LED on
+  digitalWrite(LED_RED, LOW);
+  noTone(BUZZER_PIN); // Buzzer off
+
+  // Display welcome message
+  lcd.clear();
+  lcd.setCursor(4, 0);
+  lcd.print("WELCOME");
+  lcd.setCursor(1, 1);
+  lcd.print("AquaGuard SYS ON");
+  lcd.setCursor(2, 2);
+  lcd.print("Sensors Working");
+  delay(3000); // Display for 3 seconds
+  lcd.clear();
+}
+
+void loop() {
+  // Read temperature and humidity from DHT11
+  float temperature = dht.readTemperature();
+  float humidity = dht.readHumidity();
+
+  // Read sensor values
+  int co2_value = analogRead(CO2_PIN);
+  int mq135_value = analogRead(MQ135_PIN) / 2; // Divide MQ-135 value by 2
+  int mq2_value = analogRead(MQ2_PIN);
+  int mq7_value = analogRead(MQ7_PIN);
+  int mq8_value = analogRead(MQ8_PIN);
+  int mq6_value = analogRead(MQ6_PIN);
+  int mq9_value = analogRead(MQ9_PIN);
+  int flame_value = digitalRead(FLAME_SENSOR_PIN); // Read flame sensor (1 = no fire, 0 = fire)
+
+  // Thresholds for abnormal conditions
+  bool sensor_alert = false;
+  String alert_message = "";
+
+  // Check each sensor and update alerts
+  if (co2_value > 800) {
+    alert_message = "CO2 Level High!";
+    Serial.println("Abnormal CO2 value detected!");
+    sensor_alert = true;
+  } else if (mq135_value > 200) {
+    alert_message = "MQ-135 Level High!";
+    Serial.println("Abnormal MQ-135 value detected!");
+    sensor_alert = true;
+  } else if (mq2_value > 500) {
+    alert_message = "MQ-2 Level High!";
+    Serial.println("Abnormal MQ-2 value detected!");
+    sensor_alert = true;
+  } else if (mq7_value > 500) {
+    alert_message = "MQ-7 Level High!";
+    Serial.println("Abnormal MQ-7 value detected!");
+    sensor_alert = true;
+  } else if (mq8_value > 300) {
+    alert_message = "MQ-8 Level High!";
+    Serial.println("Abnormal MQ-8 value detected!");
+    sensor_alert = true;
+  } else if (mq6_value > 500) {
+    alert_message = "MQ-6 Level High!";
+    Serial.println("Abnormal MQ-6 value detected!");
+    sensor_alert = true;
+  } else if (mq9_value > 500) {
+    alert_message = "MQ-9 Level High!";
+    Serial.println("Abnormal MQ-9 value detected!");
+    sensor_alert = true;
+  } else if (flame_value == 0) { // Flame detected
+    alert_message = "Flame Detected!";
+    Serial.println("Flame detected!");
+    sensor_alert = true;
+  }
+
+  // Set LED color and buzzer state based on sensor readings
+  if (sensor_alert) {
+    digitalWrite(LED_GREEN, LOW);  // Turn off green
+    digitalWrite(LED_RED, HIGH);  // Turn on red
+
+    // Turn the buzzer on for 3 seconds
+    tone(BUZZER_PIN, 800); // 800 Hz frequency
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("WARNING!");
+    lcd.setCursor(0, 1);
+    lcd.print(alert_message);
+    lcd.setCursor(0, 2);
+    lcd.print("Leave the room!");
+    delay(5000);           // Warning message for 5 seconds
+    noTone(BUZZER_PIN);    // Turn off buzzer
+  } else {
+    digitalWrite(LED_GREEN, HIGH); // Turn on green
+    digitalWrite(LED_RED, LOW);    // Turn off red
+    noTone(BUZZER_PIN);            // Ensure buzzer is off
+
+    // Display all sensor values in sections
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Temp: ");
+    lcd.print(temperature, 1);
+    lcd.print("C");
+    lcd.setCursor(10, 0);
+    lcd.print("Hum: ");
+    lcd.print(humidity, 1);
+    lcd.print("%");
+
+    lcd.setCursor(0, 1);
+    lcd.print("CO2: ");
+    lcd.print(co2_value);
+    lcd.setCursor(10, 1);
+    lcd.print("MQ135: ");
+    lcd.print(mq135_value);
+
+    lcd.setCursor(0, 2);
+    lcd.print("MQ-2: ");
+    lcd.print(mq2_value);
+    lcd.setCursor(10, 2);
+    lcd.print("MQ-7: ");
+    lcd.print(mq7_value);
+
+    lcd.setCursor(0, 3);
+    lcd.print("MQ-8: ");
+    lcd.print(mq8_value);
+    lcd.setCursor(10, 3);
+    lcd.print("MQ-6: ");
+    lcd.print(mq6_value);
+
+    delay(3000);
+
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("MQ-9: ");
+    lcd.print(mq9_value);
+    lcd.setCursor(10, 0);
+    lcd.print("Flame: ");
+    lcd.print(flame_value == 0 ? "Yes" : "No");
+
+    delay(3000); // Scroll delay for additional values
+  }
+}
